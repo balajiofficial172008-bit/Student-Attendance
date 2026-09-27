@@ -54,8 +54,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">🎓</div>
           <div className="sidebar-logo-text">
-            <div className="sidebar-logo-title">Attend Pro</div>
-            <div className="sidebar-logo-sub">College ERP System</div>
+            <div className="sidebar-logo-college" title="Mahendra Engineering College (Autonomous)">
+              Mahendra Engg College
+            </div>
+            <div className="sidebar-logo-campus">
+              Autonomous • Main Campus
+            </div>
+            <div className="sidebar-logo-sub">
+              Attend Pro ERP
+            </div>
           </div>
           <button className="btn btn-ghost btn-icon" style={{ color: 'rgba(255,255,255,0.5)', marginLeft: 'auto' }} onClick={onClose}>
             <X size={16} />

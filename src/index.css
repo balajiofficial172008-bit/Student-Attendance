@@ -155,14 +155,26 @@ ul, ol { list-style: none; }
   box-shadow: 0 4px 12px rgba(79,70,229,0.4);
   flex-shrink: 0;
 }
-.sidebar-logo-text { flex: 1; }
+.sidebar-logo-text { flex: 1; min-width: 0; }
 .sidebar-logo-title {
   font-size: 14px; font-weight: 700;
   color: #fff; line-height: 1.2;
 }
+.sidebar-logo-college {
+  font-size: 13px; font-weight: 700;
+  color: #fff; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-logo-campus {
+  font-size: 10.5px; color: var(--color-accent-light);
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 2px;
+}
 .sidebar-logo-sub {
-  font-size: 11px; color: rgba(255,255,255,0.45);
-  font-weight: 400;
+  font-size: 10px; color: rgba(255,255,255,0.45);
+  font-weight: 500;
+  letter-spacing: 0.4px;
 }
 .sidebar-nav { padding: 16px 12px; flex: 1; }
 .sidebar-section-label {
@@ -280,6 +292,36 @@ ul, ol { list-style: none; }
 }
 .navbar-page-sub {
   font-size: 12px; color: var(--text-muted);
+}
+.navbar-institution {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-full);
+}
+.inst-badge-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.inst-badge-text {
+  display: flex;
+  flex-direction: column;
+}
+.inst-badge-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.inst-badge-sub {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+  letter-spacing: 0.3px;
+  line-height: 1.2;
 }
 .navbar-actions {
   display: flex; align-items: center; gap: 8px;
@@ -946,3 +988,160 @@ ul, ol { list-style: none; }
 @media (max-width: 900px) {
   .profile-detail-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ─── Institution Banner (Dashboard) ─── */
+.dashboard-institution-banner {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #4338ca 100%);
+  border-radius: var(--border-radius-lg);
+  padding: 24px 28px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.dashboard-institution-banner::after {
+  content: '🏛️';
+  position: absolute;
+  right: 18px;
+  bottom: -15px;
+  font-size: 100px;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.inst-banner-main {
+  position: relative;
+  z-index: 1;
+}
+.inst-banner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.22);
+  backdrop-filter: blur(4px);
+  padding: 4px 12px;
+  border-radius: var(--border-radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #67e8f9;
+  margin-bottom: 10px;
+}
+.inst-banner-badge .badge-sep {
+  opacity: 0.6;
+}
+.inst-banner-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+  letter-spacing: -0.3px;
+}
+.inst-banner-desc {
+  font-size: 13.5px;
+  color: rgba(255,255,255,0.85);
+  margin: 0;
+}
+.inst-banner-date-badge {
+  position: relative;
+  z-index: 1;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: var(--border-radius);
+  padding: 12px 18px;
+  text-align: right;
+  backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+.banner-date-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 2px;
+}
+.banner-date-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+}
+@media (max-width: 768px) {
+  .dashboard-institution-banner {
+    padding: 18px 20px;
+  }
+  .inst-banner-title {
+    font-size: 18px;
+  }
+}
+
+/* ─── Official Report Institution Banner ─── */
+.report-inst-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  background: var(--bg-surface-2);
+  border-bottom: 2px solid var(--border-color);
+  border-top-left-radius: var(--border-radius-lg);
+  border-top-right-radius: var(--border-radius-lg);
+}
+.report-inst-logo {
+  font-size: 34px;
+  flex-shrink: 0;
+}
+.report-inst-details {
+  flex: 1;
+}
+.report-inst-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  margin: 0 0 3px 0;
+}
+.report-inst-campus {
+  font-size: 12px;
+  color: var(--color-primary);
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+.report-inst-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .sidebar, .navbar, .page-header .page-actions, .report-card, .btn {
+    display: none !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+  }
+  .page-content {
+    padding: 0 !important;
+  }
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .report-inst-banner {
+    border-bottom: 2px solid #000 !important;
+    background: #fff !important;
+    padding: 12px 0 !important;
+  }
+}
+

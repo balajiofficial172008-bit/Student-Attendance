@@ -50,13 +50,32 @@ export default function LoginPage() {
     <div className="login-page">
       {/* Left Panel */}
       <div className="login-left">
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 440, textAlign: 'center' }}>
-          <div style={{ fontSize: 72, marginBottom: 24 }}>🎓</div>
-          <h1 style={{ fontSize: 36, fontWeight: 800, marginBottom: 16, lineHeight: 1.2 }}>
-            Attend Pro
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 460, textAlign: 'center' }}>
+          <div style={{ fontSize: 64, marginBottom: 18 }}>🎓</div>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            padding: '5px 14px',
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#67e8f9',
+            letterSpacing: '0.4px',
+            marginBottom: 16
+          }}>
+            🏛️ Autonomous Institution • Main Campus
+          </div>
+          <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 8, lineHeight: 1.25 }}>
+            Mahendra Engineering College
           </h1>
-          <p style={{ fontSize: 16, opacity: 0.8, marginBottom: 40, lineHeight: 1.8 }}>
-            A complete College Attendance Management System. Track students, manage attendance, and generate insightful reports — all in one place.
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 16 }}>
+            (Autonomous) — Main Campus
+          </div>
+          <p style={{ fontSize: 14.5, opacity: 0.85, marginBottom: 36, lineHeight: 1.7 }}>
+            Official Student Attendance & Academic ERP Portal. Real-time attendance tracking, student analytics, and institutional reports.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {[
@@ -77,6 +96,14 @@ export default function LoginPage() {
       {/* Right Panel */}
       <div className="login-right">
         <div className="login-logo">🎓</div>
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-primary)' }}>
+            Mahendra Engineering College (Autonomous)
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+            Main Campus • Attend Pro Portal
+          </div>
+        </div>
 
         {mode === 'login' ? (
           <>

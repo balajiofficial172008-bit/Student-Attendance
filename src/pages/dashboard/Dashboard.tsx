@@ -133,6 +133,25 @@ export default function Dashboard() {
 
   return (
     <div>
+      {/* Institution Banner */}
+      <div className="dashboard-institution-banner">
+        <div className="inst-banner-main">
+          <div className="inst-banner-badge">
+            <span>🏛️ Autonomous Institution</span>
+            <span className="badge-sep">•</span>
+            <span>Main Campus</span>
+          </div>
+          <h1 className="inst-banner-title">Mahendra Engineering College (Autonomous)</h1>
+          <p className="inst-banner-desc">Student Attendance Management Portal • Main Campus</p>
+        </div>
+        <div className="inst-banner-date-badge hide-mobile">
+          <div className="banner-date-label">Academic Session</div>
+          <div className="banner-date-value">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+          </div>
+        </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="stats-grid">
         <StatCard icon={Users} label="Total Students" value={stats.totalStudents} color="primary" />

@@ -188,6 +188,24 @@ export default function SettingsPage() {
           <div className="card-header"><span className="card-title">System Preferences</span></div>
           <div className="card-body">
             <div className="settings-section">
+              <div className="settings-section-title">Institution Information</div>
+              <div className="settings-item">
+                <div>
+                  <div className="settings-item-label">College Name</div>
+                  <div className="settings-item-desc">Mahendra Engineering College (Autonomous)</div>
+                </div>
+                <span className="badge badge-primary">Autonomous</span>
+              </div>
+              <div className="settings-item">
+                <div>
+                  <div className="settings-item-label">Campus Location</div>
+                  <div className="settings-item-desc">Main Campus • Approved by AICTE, Affiliated to Anna University</div>
+                </div>
+                <span className="badge badge-success">Main Campus</span>
+              </div>
+            </div>
+
+            <div className="settings-section">
               <div className="settings-section-title">Appearance</div>
               <div className="settings-item">
                 <div>

@@ -182,6 +182,8 @@ export const seedNotifications: Notification[] = [
 ];
 
 export const seedSettings: Settings = {
+  collegeName: 'Mahendra Engineering College (Autonomous)',
+  campusName: 'Main Campus',
   attendanceThreshold: 75,
   theme: 'light',
   emailNotifications: true,

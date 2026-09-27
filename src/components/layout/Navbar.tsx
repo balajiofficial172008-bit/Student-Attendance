@@ -46,6 +46,14 @@ export default function Navbar({ onMenuToggle, pageTitle }: NavbarProps) {
         {info.subtitle && <div className="navbar-page-sub">{info.subtitle}</div>}
       </div>
 
+      <div className="navbar-institution hide-mobile">
+        <span className="inst-badge-icon">🏛️</span>
+        <div className="inst-badge-text">
+          <div className="inst-badge-title">Mahendra Engineering College (Autonomous)</div>
+          <div className="inst-badge-sub">Main Campus</div>
+        </div>
+      </div>
+
       <div className="navbar-actions">
         <button className="navbar-icon-btn" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}

@@ -221,6 +221,8 @@ export interface DepartmentFormData {
 }
 
 export interface Settings {
+  collegeName?: string;
+  campusName?: string;
   attendanceThreshold: number;
   theme: 'light' | 'dark';
   emailNotifications: boolean;

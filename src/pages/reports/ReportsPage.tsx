@@ -100,12 +100,18 @@ export default function ReportsPage() {
 
   const exportCSV = () => {
     if (!reportData.length) return;
+    const headerLines = [
+      'Mahendra Engineering College (Autonomous) - Main Campus',
+      reportTitle,
+      `Generated on: ${new Date().toLocaleDateString('en-IN')}`,
+      '',
+    ];
     const keys = Object.keys(reportData[0]);
-    const rows = [keys, ...reportData.map(r => keys.map(k => r[k]))];
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const rows = [keys.map(k => k.replace(/([A-Z])/g, ' $1').trim()), ...reportData.map(r => keys.map(k => `"${String(r[k] ?? '').replace(/"/g, '""')}"`))];
+    const csv = headerLines.join('\n') + rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${activeReport}_report.csv`; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `MEC_${activeReport}_report.csv`; a.click();
     toast.success('CSV exported!');
   };
 
@@ -141,6 +147,14 @@ export default function ReportsPage() {
       {/* Report Output */}
       {activeReport && reportData.length > 0 && (
         <div className="card">
+          <div className="report-inst-banner">
+            <div className="report-inst-logo">🎓</div>
+            <div className="report-inst-details">
+              <h2 className="report-inst-name">MAHENDRA ENGINEERING COLLEGE (AUTONOMOUS)</h2>
+              <p className="report-inst-campus">Main Campus • Approved by AICTE, Affiliated to Anna University</p>
+              <p className="report-inst-title">OFFICE OF ACADEMIC AFFAIRS — {reportTitle.toUpperCase()}</p>
+            </div>
+          </div>
           <div className="card-header">
             <span className="card-title">{reportTitle}</span>
             <span className="badge badge-success">{reportData.length} records</span>
