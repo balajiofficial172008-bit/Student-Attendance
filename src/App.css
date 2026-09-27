@@ -1,0 +1,10 @@
+/* App-level styles (most styles are in index.css) */
+#root {
+  min-height: 100vh;
+}
+
+@media print {
+  .sidebar, .navbar, .page-actions, .btn, .table-actions { display: none !important; }
+  .main-content { margin-left: 0 !important; }
+  .page-content { margin-top: 0 !important; }
+}
