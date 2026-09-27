@@ -8,8 +8,8 @@ type FormMode = 'login' | 'forgot';
 
 export default function LoginPage() {
   const [mode, setMode] = useState<FormMode>('login');
-  const [email, setEmail] = useState('admin@college.edu');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

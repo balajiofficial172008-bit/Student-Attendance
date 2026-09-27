@@ -39,16 +39,21 @@ export const authService = {
     );
     if (!user) throw new Error('No account found with this email address.');
     if (passwords[user.email] !== credentials.password) throw new Error('Incorrect password. Please try again.');
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    localStorage.removeItem(CURRENT_USER_KEY);
     return user;
   },
 
   logout(): void {
+    sessionStorage.removeItem(CURRENT_USER_KEY);
     localStorage.removeItem(CURRENT_USER_KEY);
   },
 
   getCurrentUser(): User | null {
-    const data = localStorage.getItem(CURRENT_USER_KEY);
+    if (localStorage.getItem(CURRENT_USER_KEY)) {
+      localStorage.removeItem(CURRENT_USER_KEY);
+    }
+    const data = sessionStorage.getItem(CURRENT_USER_KEY);
     return data ? JSON.parse(data) : null;
   },
 
@@ -60,7 +65,7 @@ export const authService = {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
     const currentUser = authService.getCurrentUser();
     if (currentUser?.id === userId) {
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(users[idx]));
+      sessionStorage.setItem(CURRENT_USER_KEY, JSON.stringify(users[idx]));
     }
     return users[idx];
   },
@@ -87,5 +92,6 @@ export const authService = {
   resetData(): void {
     const keys = Object.keys(localStorage).filter(k => k.startsWith('sams_'));
     keys.forEach(k => { if (k !== CURRENT_USER_KEY) localStorage.removeItem(k); });
+    sessionStorage.removeItem(CURRENT_USER_KEY);
   },
 };
