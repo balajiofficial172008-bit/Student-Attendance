@@ -1,7 +1,7 @@
 export type UserRole = 'admin' | 'faculty';
 export type Gender = 'male' | 'female' | 'other';
 export type EnrollmentStatus = 'active' | 'inactive' | 'graduated' | 'dropped';
-export type AttendanceStatus = 'present' | 'absent' | 'late';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'on_duty' | 'medical_leave';
 export type NotificationType = 'alert' | 'success' | 'info' | 'warning';
 export type FacultyStatus = 'active' | 'inactive' | 'on_leave';
 
@@ -12,6 +12,7 @@ export interface User {
   role: UserRole;
   avatar?: string;
   facultyId?: string;
+  token?: string;
   createdAt: string;
 }
 
@@ -94,8 +95,13 @@ export interface AttendanceSession {
   facultyId: string;
   faculty?: Faculty;
   date: string;
+  period?: number;
+  periodLabel?: string;
   startTime?: string;
   endTime?: string;
+  totalStudents?: number;
+  presentCount?: number;
+  absentCount?: number;
   createdAt: string;
 }
 
@@ -230,3 +236,67 @@ export interface Settings {
   autoMarkAbsent: boolean;
   workingDaysPerWeek: number;
 }
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  entityType: 'attendance' | 'student' | 'leave' | 'auth' | 'settings' | 'system';
+  entityId?: string;
+  details: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  timestamp: string;
+  ip?: string;
+}
+
+export interface LeaveRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  registerNumber: string;
+  departmentId: string;
+  type: 'on_duty' | 'medical_leave' | 'casual_leave';
+  startDate: string;
+  endDate: string;
+  reason: string;
+  documentUrl?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  createdAt: string;
+}
+
+export interface EligibilityPrediction {
+  studentId: string;
+  studentName: string;
+  registerNumber: string;
+  departmentName?: string;
+  currentPercentage: number;
+  targetPercentage: number;
+  totalConducted: number;
+  totalAttended: number;
+  status: 'safe' | 'warning' | 'critical';
+  classesNeededToReachTarget: number;
+  classesCanSafelyMiss: number;
+  advice: string;
+}
+
+export interface BackendStatusInfo {
+  mode: 'live_api' | 'resilient_mock';
+  url: string;
+  latencyMs: number;
+  serverTime?: string;
+  uptime?: number;
+  connected: boolean;
+}
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data: T;
+  message?: string;
+  meta?: Record<string, any>;
+  error?: string;
+}
+

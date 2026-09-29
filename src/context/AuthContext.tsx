@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const loggedInUser = authService.login({ email, password });
+    const loggedInUser = await authService.login({ email, password });
     setUser(loggedInUser);
   };
 
@@ -32,9 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const updateUser = (updates: Partial<User>) => {
+  const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
-    const updated = authService.updateProfile(user.id, updates);
+    const updated = await authService.updateProfile(user.id, updates);
     setUser(updated);
   };
 

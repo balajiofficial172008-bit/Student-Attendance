@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, Edit2, Trash2, Filter, Download, UserCheck } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Trash2, Filter, Download, UserCheck, Calculator, Upload } from 'lucide-react';
 import { studentService } from '../../services/studentService';
 import { departmentService } from '../../services/departmentService';
 import { notificationService } from '../../services/notificationService';
-import { Student, Department } from '../../types';
+import { attendanceService } from '../../services/attendanceService';
+import { Student, Department, EligibilityPrediction } from '../../types';
 import StudentFormModal from './StudentFormModal';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -19,10 +20,17 @@ export default function StudentsPage() {
   const [yearFilter, setYearFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [riskFilter, setRiskFilter] = useState<'all' | 'defaulters' | 'critical' | 'safe'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editStudent, setEditStudent] = useState<Student | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Calculator Modal
+  const [calcStudent, setCalcStudent] = useState<Student | null>(null);
+  const [calcTarget, setCalcTarget] = useState(75);
+  const [calcPrediction, setCalcPrediction] = useState<EligibilityPrediction | null>(null);
+  const [calcLoading, setCalcLoading] = useState(false);
 
   const load = () => {
     setStudents(studentService.getAll());
@@ -38,8 +46,38 @@ export default function StudentsPage() {
     const matchYear = !yearFilter || s.year === Number(yearFilter);
     const matchSection = !sectionFilter || s.section === sectionFilter;
     const matchStatus = !statusFilter || s.enrollmentStatus === statusFilter;
-    return matchSearch && matchDept && matchYear && matchSection && matchStatus;
+
+    const pct = s.attendancePercentage ?? 0;
+    let matchRisk = true;
+    if (riskFilter === 'defaulters') matchRisk = pct < 75;
+    else if (riskFilter === 'critical') matchRisk = pct < 60;
+    else if (riskFilter === 'safe') matchRisk = pct >= 75;
+
+    return matchSearch && matchDept && matchYear && matchSection && matchStatus && matchRisk;
   });
+
+  const openCalculator = async (s: Student) => {
+    setCalcStudent(s);
+    setCalcLoading(true);
+    try {
+      const pred = await attendanceService.predictEligibility(s.id, calcTarget);
+      setCalcPrediction(pred);
+    } catch {
+      toast.error('Prediction failed');
+    } finally {
+      setCalcLoading(false);
+    }
+  };
+
+  const handleTargetChange = async (t: number) => {
+    setCalcTarget(t);
+    if (calcStudent) {
+      setCalcLoading(true);
+      const pred = await attendanceService.predictEligibility(calcStudent.id, t);
+      setCalcPrediction(pred);
+      setCalcLoading(false);
+    }
+  };
 
   const handleDelete = () => {
     if (!deleteId) return;
@@ -90,6 +128,25 @@ export default function StudentsPage() {
           <button className="btn btn-secondary" onClick={exportCSV}><Download size={16} />Export CSV</button>
           <button className="btn btn-primary" onClick={() => { setEditStudent(null); setShowModal(true); }}><Plus size={16} />Add Student</button>
         </div>
+      </div>
+
+      {/* Risk Filter Tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+        {[
+          { key: 'all', label: 'All Students', count: students.length },
+          { key: 'defaulters', label: '⚠️ Defaulters (< 75%)', count: students.filter(s => (s.attendancePercentage ?? 0) < 75).length },
+          { key: 'critical', label: '⛔ Critical (< 60%)', count: students.filter(s => (s.attendancePercentage ?? 0) < 60).length },
+          { key: 'safe', label: '✅ Eligible (≥ 75%)', count: students.filter(s => (s.attendancePercentage ?? 0) >= 75).length },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setRiskFilter(tab.key as any)}
+            className={`btn btn-sm ${riskFilter === tab.key ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            {tab.label} <span style={{ opacity: 0.75, marginLeft: 4 }}>({tab.count})</span>
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -170,6 +227,9 @@ export default function StudentsPage() {
                     </td>
                     <td>
                       <div className="table-actions">
+                        <button className="btn btn-ghost btn-icon btn-sm" title="Detention Risk Predictor" onClick={() => openCalculator(s)}>
+                          <Calculator size={15} color="#6366f1" />
+                        </button>
                         <button className="btn btn-ghost btn-icon btn-sm" title="View Profile" onClick={() => navigate(`/students/${s.id}`)}><Eye size={15} /></button>
                         <button className="btn btn-ghost btn-icon btn-sm" title="Edit" onClick={() => { setEditStudent(s); setShowModal(true); }}><Edit2 size={15} /></button>
                         <button className="btn btn-ghost btn-icon btn-sm" title="Delete" style={{ color: 'var(--color-danger)' }} onClick={() => { setDeleteId(s.id); setShowDeleteConfirm(true); }}><Trash2 size={15} /></button>
@@ -205,6 +265,109 @@ export default function StudentsPage() {
                 <button className="btn btn-secondary" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
                 <button className="btn btn-danger" onClick={handleDelete}>Delete</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detention & Eligibility Calculator Modal */}
+      {calcStudent && (
+        <div className="modal-overlay" onClick={() => setCalcStudent(null)}>
+          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(99,102,241,0.12)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Calculator size={18} />
+                </div>
+                <div>
+                  <h3 className="modal-title" style={{ fontSize: 15 }}>Detention Risk & Eligibility Predictor</h3>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {calcStudent.name} ({calcStudent.registerNumber})
+                  </div>
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setCalcStudent(null)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              {calcLoading ? (
+                <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>Computing algorithms...</div>
+              ) : calcPrediction ? (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Target Threshold: {calcTarget}%</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[75, 80, 85].map(t => (
+                        <button
+                          key={t}
+                          className={`btn btn-sm ${calcTarget === t ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ padding: '2px 8px', fontSize: 11 }}
+                          onClick={() => handleTargetChange(t)}
+                        >
+                          {t}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Score Highlight Card */}
+                  <div style={{
+                    background: calcPrediction.status === 'critical'
+                      ? 'rgba(239, 68, 68, 0.08)'
+                      : calcPrediction.status === 'warning'
+                      ? 'rgba(245, 158, 11, 0.08)'
+                      : 'rgba(16, 185, 129, 0.08)',
+                    border: `1px solid ${calcPrediction.status === 'critical' ? '#fca5a5' : calcPrediction.status === 'warning' ? '#fde68a' : '#6ee7b7'}`,
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 16,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Current Standing</div>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: calcPrediction.currentPercentage >= calcTarget ? '#10b981' : '#ef4444' }}>
+                          {calcPrediction.currentPercentage}%
+                        </div>
+                      </div>
+                      <span className={`badge ${calcPrediction.status === 'critical' ? 'badge-danger' : calcPrediction.status === 'warning' ? 'badge-warning' : 'badge-success'}`}>
+                        {calcPrediction.status === 'critical' ? '⛔ CRITICAL DETENTION RISK' : calcPrediction.status === 'warning' ? '⚠️ WARNING ZONE' : '✅ SAFE & ELIGIBLE'}
+                      </span>
+                    </div>
+
+                    <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.5, color: 'var(--text-primary)' }}>
+                      <strong>Algorithmic Advice:</strong> {calcPrediction.advice}
+                    </div>
+                  </div>
+
+                  {/* Stat Breakdown Grid */}
+                  <div className="form-grid form-grid-2" style={{ marginBottom: 0 }}>
+                    <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total Conducted Hours</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{calcPrediction.totalConducted} classes</div>
+                    </div>
+                    <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Attended / Credit Hours</div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{calcPrediction.totalAttended} classes</div>
+                    </div>
+                    <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Classes Needed to Reach {calcTarget}%</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#ef4444' }}>
+                        {calcPrediction.classesNeededToReachTarget} consecutive
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Safe Bunk Allowance</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#10b981' }}>
+                        {calcPrediction.classesCanSafelyMiss} classes
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setCalcStudent(null)}>Close</button>
             </div>
           </div>
         </div>

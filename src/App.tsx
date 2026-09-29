@@ -14,6 +14,8 @@ import SubjectsPage from './pages/subjects/SubjectsPage';
 import FacultyPage from './pages/faculty/FacultyPage';
 import DepartmentsPage from './pages/departments/DepartmentsPage';
 import ReportsPage from './pages/reports/ReportsPage';
+import LeaveManagementPage from './pages/leaves/LeaveManagementPage';
+import AuditLogsPage from './pages/audit/AuditLogsPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 
@@ -39,10 +41,12 @@ function AppRoutes() {
       <Route path="/students/:id" element={<ProtectedRoute><Layout><StudentProfilePage /></Layout></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute><Layout><AttendancePage /></Layout></ProtectedRoute>} />
       <Route path="/attendance-history" element={<ProtectedRoute><Layout><AttendanceHistoryPage /></Layout></ProtectedRoute>} />
+      <Route path="/leaves" element={<ProtectedRoute><Layout><LeaveManagementPage /></Layout></ProtectedRoute>} />
       <Route path="/subjects" element={<ProtectedRoute><Layout><SubjectsPage /></Layout></ProtectedRoute>} />
       <Route path="/faculty" element={<ProtectedRoute><Layout><FacultyPage /></Layout></ProtectedRoute>} />
       <Route path="/departments" element={<ProtectedRoute><Layout><DepartmentsPage /></Layout></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Layout><ReportsPage /></Layout></ProtectedRoute>} />
+      <Route path="/audit-logs" element={<ProtectedRoute><Layout><AuditLogsPage /></Layout></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><Layout><NotificationsPage /></Layout></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Layout><SettingsPage /></Layout></ProtectedRoute>} />
       <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />

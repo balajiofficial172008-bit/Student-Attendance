@@ -55,8 +55,13 @@ export default function AttendanceHistoryPage() {
       const studentMap: Record<string, { present: number; absent: number }> = {};
       filteredRecords.forEach(r => {
         if (!studentMap[r.studentId]) studentMap[r.studentId] = { present: 0, absent: 0 };
-        if (r.status === 'present') studentMap[r.studentId].present++;
-        else studentMap[r.studentId].absent++;
+        if (r.status === 'present' || r.status === 'on_duty' || r.status === 'medical_leave') {
+          studentMap[r.studentId].present++;
+        } else if (r.status === 'late') {
+          studentMap[r.studentId].present += 0.5;
+        } else {
+          studentMap[r.studentId].absent++;
+        }
       });
       const stats = Object.entries(studentMap).map(([sid, data]) => {
         const s = allStudents.find(st => st.id === sid);
@@ -86,8 +91,13 @@ export default function AttendanceHistoryPage() {
         if (!subMap[sess.subjectId]) subMap[sess.subjectId] = { present: 0, absent: 0 };
         const recs = filteredRecords.filter(r => r.sessionId === sess.id);
         recs.forEach(r => {
-          if (r.status === 'present') subMap[sess.subjectId].present++;
-          else subMap[sess.subjectId].absent++;
+          if (r.status === 'present' || r.status === 'on_duty' || r.status === 'medical_leave') {
+            subMap[sess.subjectId].present++;
+          } else if (r.status === 'late') {
+            subMap[sess.subjectId].present += 0.5;
+          } else {
+            subMap[sess.subjectId].absent++;
+          }
         });
       });
       const stats = Object.entries(subMap).map(([subId, data]) => {
@@ -113,8 +123,13 @@ export default function AttendanceHistoryPage() {
         if (!dateMap[sess.date]) dateMap[sess.date] = { present: 0, absent: 0 };
         const recs = filteredRecords.filter(r => r.sessionId === sess.id);
         recs.forEach(r => {
-          if (r.status === 'present') dateMap[sess.date].present++;
-          else dateMap[sess.date].absent++;
+          if (r.status === 'present' || r.status === 'on_duty' || r.status === 'medical_leave') {
+            dateMap[sess.date].present++;
+          } else if (r.status === 'late') {
+            dateMap[sess.date].present += 0.5;
+          } else {
+            dateMap[sess.date].absent++;
+          }
         });
       });
       const stats = Object.entries(dateMap)

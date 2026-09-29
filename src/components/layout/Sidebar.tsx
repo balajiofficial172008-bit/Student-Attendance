@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, History, BookOpen,
-  GraduationCap, Building2, FileBarChart2, Bell, Settings, LogOut, X
+  GraduationCap, Building2, FileBarChart2, Bell, Settings, LogOut, X,
+  CalendarCheck, ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { notificationService } from '../../services/notificationService';
@@ -20,6 +21,7 @@ const navItems = [
     { to: '/students', icon: Users, label: 'Students' },
     { to: '/attendance', icon: ClipboardList, label: 'Attendance' },
     { to: '/attendance-history', icon: History, label: 'Att. History' },
+    { to: '/leaves', icon: CalendarCheck, label: 'Leave & OD' },
     { to: '/subjects', icon: BookOpen, label: 'Subjects' },
   ]},
   { label: 'Management', items: [
@@ -28,6 +30,7 @@ const navItems = [
     { to: '/reports', icon: FileBarChart2, label: 'Reports' },
   ]},
   { label: 'System', items: [
+    { to: '/audit-logs', icon: ShieldCheck, label: 'Audit Logs' },
     { to: '/notifications', icon: Bell, label: 'Notifications', badge: true },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ]},

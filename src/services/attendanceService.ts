@@ -1,5 +1,7 @@
-import { AttendanceSession, AttendanceRecord, AttendanceFilter } from '../types';
+import { AttendanceSession, AttendanceRecord, AttendanceFilter, AttendanceStatus, EligibilityPrediction } from '../types';
 import { seedSessions, seedRecords } from '../data/seedData';
+import { apiRequest, getBackendStatus } from './api/apiClient';
+import { mockBackendEngine } from './api/mockBackendEngine';
 
 const SESSIONS_KEY = 'sams_sessions';
 const RECORDS_KEY = 'sams_records';
@@ -26,20 +28,36 @@ export const attendanceService = {
     return this.getAllSessions().find(s => s.id === id);
   },
 
-  findSession(departmentId: string, year: number, section: string, subjectId: string, date: string): AttendanceSession | undefined {
+  findSession(
+    departmentId: string,
+    year: number,
+    section: string,
+    subjectId: string,
+    date: string,
+    period?: number
+  ): AttendanceSession | undefined {
     return this.getAllSessions().find(
-      s => s.departmentId === departmentId && s.year === year &&
-           s.section === section && s.subjectId === subjectId && s.date === date
+      s => s.departmentId === departmentId &&
+           s.year === Number(year) &&
+           s.section === section &&
+           s.subjectId === subjectId &&
+           s.date === date &&
+           (period !== undefined ? s.period === Number(period) : true)
     );
   },
 
   createSession(data: Omit<AttendanceSession, 'id' | 'createdAt'>): AttendanceSession {
     const sessions = this.getAllSessions();
     const existing = sessions.find(
-      s => s.departmentId === data.departmentId && s.year === data.year &&
-           s.section === data.section && s.subjectId === data.subjectId && s.date === data.date
+      s => s.departmentId === data.departmentId &&
+           s.year === Number(data.year) &&
+           s.section === data.section &&
+           s.subjectId === data.subjectId &&
+           s.date === data.date &&
+           (data.period !== undefined ? s.period === Number(data.period) : true)
     );
     if (existing) return existing;
+
     const session: AttendanceSession = {
       id: `sess_${Date.now()}`,
       ...data,
@@ -50,26 +68,41 @@ export const attendanceService = {
     return session;
   },
 
-  saveAttendance(
+  async saveAttendance(
     session: Omit<AttendanceSession, 'id' | 'createdAt'>,
-    records: { studentId: string; status: 'present' | 'absent'; time?: string }[]
-  ): void {
-    const savedSession = this.createSession(session);
-    const allRecords = this.getAllRecords();
+    records: { studentId: string; status: AttendanceStatus; time?: string; remarks?: string }[],
+    user?: any
+  ): Promise<any> {
+    const backend = getBackendStatus();
 
-    // Remove old records for this session
-    const filtered = allRecords.filter(r => r.sessionId !== savedSession.id);
+    // If connected to live Express backend, execute server-side transactional mark
+    if (backend.connected) {
+      try {
+        const res = await apiRequest('/attendance/mark', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...session,
+            records,
+          }),
+        });
 
-    const newRecords: AttendanceRecord[] = records.map(r => ({
-      id: `rec_${Date.now()}_${r.studentId}`,
-      sessionId: savedSession.id,
-      studentId: r.studentId,
-      status: r.status,
-      time: r.time,
-      createdAt: new Date().toISOString().split('T')[0],
-    }));
+        // Also update local cache for instant UI rendering
+        await mockBackendEngine.markAttendance({
+          ...session,
+          records,
+        }, user);
 
-    localStorage.setItem(RECORDS_KEY, JSON.stringify([...filtered, ...newRecords]));
+        return res.data;
+      } catch (err) {
+        console.warn('Backend mark failed, executing resilient mock engine:', err);
+      }
+    }
+
+    // Fallback or offline resilient execution
+    return await mockBackendEngine.markAttendance({
+      ...session,
+      records,
+    }, user);
   },
 
   getRecordsForSession(sessionId: string): AttendanceRecord[] {
@@ -87,7 +120,7 @@ export const attendanceService = {
   getFilteredSessions(filter: AttendanceFilter): AttendanceSession[] {
     let sessions = this.getAllSessions();
     if (filter.departmentId) sessions = sessions.filter(s => s.departmentId === filter.departmentId);
-    if (filter.year) sessions = sessions.filter(s => s.year === filter.year);
+    if (filter.year) sessions = sessions.filter(s => s.year === Number(filter.year));
     if (filter.section) sessions = sessions.filter(s => s.section === filter.section);
     if (filter.subjectId) sessions = sessions.filter(s => s.subjectId === filter.subjectId);
     if (filter.date) sessions = sessions.filter(s => s.date === filter.date);
@@ -96,48 +129,70 @@ export const attendanceService = {
     return sessions.sort((a, b) => b.date.localeCompare(a.date));
   },
 
-  getTodayStats(): { present: number; absent: number; total: number } {
+  getTodayStats(): { present: number; absent: number; late: number; onDuty: number; total: number; percentage: number } {
     const today = new Date().toISOString().split('T')[0];
     const todaySessions = this.getAllSessions().filter(s => s.date === today);
     const sessionIds = new Set(todaySessions.map(s => s.id));
     const todayRecords = this.getAllRecords().filter(r => sessionIds.has(r.sessionId));
+
     const present = todayRecords.filter(r => r.status === 'present').length;
-    return { present, absent: todayRecords.length - present, total: todayRecords.length };
+    const onDuty = todayRecords.filter(r => r.status === 'on_duty').length;
+    const late = todayRecords.filter(r => r.status === 'late').length;
+    const absent = todayRecords.filter(r => r.status === 'absent').length;
+    const total = todayRecords.length;
+
+    const effective = present + onDuty + (late * 0.5);
+    const percentage = total > 0 ? Math.round((effective / total) * 100) : 0;
+
+    return {
+      present: present + onDuty,
+      absent,
+      late,
+      onDuty,
+      total,
+      percentage,
+    };
   },
 
   getOverallPercentage(): number {
     const records = this.getAllRecords();
     if (records.length === 0) return 0;
-    const present = records.filter(r => r.status === 'present').length;
+    const present = records.filter(r => r.status === 'present' || r.status === 'on_duty').length;
     return Math.round((present / records.length) * 100);
   },
 
-  getMonthlyStats(year: number, month: number): { date: string; present: number; absent: number }[] {
+  getMonthlyStats(year: number, month: number): { date: string; present: number; absent: number; percentage: number }[] {
     const monthStr = `${year}-${String(month).padStart(2, '0')}`;
     const sessions = this.getAllSessions().filter(s => s.date.startsWith(monthStr));
-    const grouped: Record<string, { present: number; absent: number }> = {};
+    const grouped: Record<string, { present: number; absent: number; total: number }> = {};
 
     sessions.forEach(sess => {
-      if (!grouped[sess.date]) grouped[sess.date] = { present: 0, absent: 0 };
+      if (!grouped[sess.date]) grouped[sess.date] = { present: 0, absent: 0, total: 0 };
       const records = this.getRecordsForSession(sess.id);
       records.forEach(r => {
-        if (r.status === 'present') grouped[sess.date].present++;
+        grouped[sess.date].total++;
+        if (r.status === 'present' || r.status === 'on_duty') grouped[sess.date].present++;
         else grouped[sess.date].absent++;
       });
     });
 
     return Object.entries(grouped)
-      .map(([date, stats]) => ({ date, ...stats }))
+      .map(([date, stats]) => ({
+        date,
+        present: stats.present,
+        absent: stats.absent,
+        percentage: stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0,
+      }))
       .sort((a, b) => a.date.localeCompare(b.date));
   },
 
-  getStudentCalendar(studentId: string, subjectId?: string): Record<string, 'present' | 'absent'> {
+  getStudentCalendar(studentId: string, subjectId?: string): Record<string, AttendanceStatus> {
     const records = this.getRecordsForStudent(studentId, subjectId);
     const sessions = this.getAllSessions();
-    const result: Record<string, 'present' | 'absent'> = {};
+    const result: Record<string, AttendanceStatus> = {};
     records.forEach(r => {
       const session = sessions.find(s => s.id === r.sessionId);
-      if (session) result[session.date] = r.status === 'present' ? 'present' : 'absent';
+      if (session) result[session.date] = r.status;
     });
     return result;
   },
@@ -146,9 +201,25 @@ export const attendanceService = {
     const sessions = this.getAllSessions().filter(s => s.departmentId === departmentId);
     const sessionIds = new Set(sessions.map(s => s.id));
     const records = this.getAllRecords().filter(r => sessionIds.has(r.sessionId));
-    const present = records.filter(r => r.status === 'present').length;
+    const present = records.filter(r => r.status === 'present' || r.status === 'on_duty').length;
     const total = records.length;
     return { present, absent: total - present, percentage: total > 0 ? Math.round((present / total) * 100) : 0 };
+  },
+
+  async predictEligibility(studentId: string, targetPerc = 75): Promise<EligibilityPrediction> {
+    const backend = getBackendStatus();
+    if (backend.connected) {
+      try {
+        const res = await apiRequest<EligibilityPrediction>('/attendance/calculate-eligibility', {
+          method: 'POST',
+          body: JSON.stringify({ studentId, targetPercentage: targetPerc }),
+        });
+        return res.data;
+      } catch (err) {
+        console.warn('API error in predictEligibility, falling back to mock engine:', err);
+      }
+    }
+    return mockBackendEngine.predictEligibility(studentId, targetPerc);
   },
 
   deleteSession(sessionId: string): void {
@@ -156,5 +227,10 @@ export const attendanceService = {
     const records = this.getAllRecords().filter(r => r.sessionId !== sessionId);
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
     localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+
+    const backend = getBackendStatus();
+    if (backend.connected) {
+      apiRequest(`/attendance/sessions/${sessionId}`, { method: 'DELETE' }).catch(() => {});
+    }
   },
 };

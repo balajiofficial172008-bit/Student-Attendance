@@ -6,7 +6,7 @@ import { studentService } from '../../services/studentService';
 import { departmentService } from '../../services/departmentService';
 import { attendanceService } from '../../services/attendanceService';
 import { subjectService } from '../../services/subjectService';
-import { Student, Department, Subject } from '../../types';
+import { Student, Department, Subject, AttendanceStatus } from '../../types';
 import StudentFormModal from './StudentFormModal';
 import toast from 'react-hot-toast';
 
@@ -18,7 +18,7 @@ export default function StudentProfilePage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [subjectStats, setSubjectStats] = useState<any[]>([]);
-  const [calendar, setCalendar] = useState<Record<string, 'present' | 'absent'>>({});
+  const [calendar, setCalendar] = useState<Record<string, AttendanceStatus>>({});
   const [showEdit, setShowEdit] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'calendar'>('overview');
 
@@ -58,7 +58,7 @@ export default function StudentProfilePage() {
   const calMonth = now.getMonth();
   const firstDay = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const calDays: ({ day: number; status?: 'present' | 'absent' } | null)[] = Array(firstDay).fill(null);
+  const calDays: ({ day: number; status?: AttendanceStatus } | null)[] = Array(firstDay).fill(null);
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     calDays.push({ day: d, status: calendar[dateStr] });

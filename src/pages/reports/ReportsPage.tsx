@@ -39,7 +39,24 @@ export default function ReportsPage() {
         const dept = departments.find(d => d.id === sess.departmentId);
         const records = attendanceService.getRecordsForSession(sess.id);
         const present = records.filter(r => r.status === 'present').length;
-        return { subject: subject?.code || '—', dept: dept?.code || '—', year: sess.year, section: sess.section, present, absent: records.length - present, total: records.length, percentage: records.length > 0 ? Math.round((present / records.length) * 100) : 0 };
+        const onDuty = records.filter(r => r.status === 'on_duty').length;
+        const late = records.filter(r => r.status === 'late').length;
+        const absent = records.filter(r => r.status === 'absent').length;
+        const effective = present + onDuty + (late * 0.5);
+        const percentage = records.length > 0 ? Math.round((effective / records.length) * 100) : 0;
+        return {
+          subject: subject?.code || '—',
+          dept: dept?.code || '—',
+          period: sess.periodLabel || (sess.period ? `Period ${sess.period}` : 'Full Day'),
+          year: sess.year,
+          section: sess.section,
+          present,
+          onDuty,
+          late,
+          absent,
+          total: records.length,
+          percentage,
+        };
       });
       setReportData(data);
     } else if (type === 'student') {
@@ -47,7 +64,18 @@ export default function ReportsPage() {
       const data = students.slice(0, 30).map(s => {
         const summary = studentService.getAttendanceSummary(s.id);
         const dept = departments.find(d => d.id === s.departmentId);
-        return { name: s.name, regNo: s.registerNumber, dept: dept?.code || '—', year: s.year, section: s.section, present: summary.presentDays, absent: summary.absentDays, total: summary.totalDays, percentage: summary.percentage };
+        return {
+          name: s.name,
+          regNo: s.registerNumber,
+          dept: dept?.code || '—',
+          year: s.year,
+          section: s.section,
+          present: summary.presentDays,
+          absent: summary.absentDays,
+          total: summary.totalDays,
+          percentage: summary.percentage,
+          eligibility: summary.percentage >= 75 ? '✅ Eligible' : summary.percentage >= 60 ? '⚠️ Warning' : '⛔ Critical Defaulter'
+        };
       });
       setReportData(data);
     } else if (type === 'subject') {
@@ -57,8 +85,13 @@ export default function ReportsPage() {
         const sessionIds = new Set(sessions.map(s => s.id));
         const records = attendanceService.getAllRecords().filter(r => sessionIds.has(r.sessionId));
         const present = records.filter(r => r.status === 'present').length;
+        const onDuty = records.filter(r => r.status === 'on_duty').length;
+        const late = records.filter(r => r.status === 'late').length;
+        const absent = records.filter(r => r.status === 'absent').length;
+        const effective = present + onDuty + (late * 0.5);
         const dept = departments.find(d => d.id === sub.departmentId);
-        return { name: sub.name, code: sub.code, dept: dept?.code || '—', sessions: sessions.length, present, absent: records.length - present, total: records.length, percentage: records.length > 0 ? Math.round((present / records.length) * 100) : 0 };
+        const percentage = records.length > 0 ? Math.round((effective / records.length) * 100) : 0;
+        return { name: sub.name, code: sub.code, dept: dept?.code || '—', sessions: sessions.length, present, onDuty, absent, total: records.length, percentage };
       }).filter(s => s.total > 0);
       setReportData(data);
     } else if (type === 'department') {
@@ -90,7 +123,11 @@ export default function ReportsPage() {
         const sessionIds = new Set(sessions.map(s => s.id));
         const records = attendanceService.getAllRecords().filter(r => sessionIds.has(r.sessionId));
         const present = records.filter(r => r.status === 'present').length;
-        data.push({ date: dateStr, present, absent: records.length - present, total: records.length, percentage: records.length > 0 ? Math.round((present / records.length) * 100) : 0 });
+        const onDuty = records.filter(r => r.status === 'on_duty').length;
+        const late = records.filter(r => r.status === 'late').length;
+        const absent = records.filter(r => r.status === 'absent').length;
+        const effective = present + onDuty + (late * 0.5);
+        data.push({ date: dateStr, present: Math.round(effective), absent, total: records.length, percentage: records.length > 0 ? Math.round((effective / records.length) * 100) : 0 });
       }
       setReportData(data);
     }

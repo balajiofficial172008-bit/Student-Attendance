@@ -13,11 +13,12 @@ import { attendanceService } from '../../services/attendanceService';
 import { departmentService } from '../../services/departmentService';
 import { subjectService } from '../../services/subjectService';
 import { facultyService } from '../../services/facultyService';
+import { leaveService } from '../../services/leaveService';
 import { DashboardStats } from '../../types';
 
-function StatCard({ icon: Icon, label, value, color, change }: any) {
+function StatCard({ icon: Icon, label, value, color, change, onClick }: any) {
   return (
-    <div className={`stat-card ${color}`}>
+    <div className={`stat-card ${color}`} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       <div className={`stat-icon ${color}`}>
         <Icon size={24} />
       </div>
@@ -48,6 +49,7 @@ export default function Dashboard() {
   const [deptData, setDeptData] = useState<any[]>([]);
   const [lowAttStudents, setLowAttStudents] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
 
   useEffect(() => {
     // Stats
@@ -58,6 +60,10 @@ export default function Dashboard() {
     const todayStats = attendanceService.getTodayStats();
     const overallPct = attendanceService.getOverallPercentage();
     const lowAtt = studentService.getLowAttendanceStudents(75);
+
+    leaveService.getAll(undefined, 'pending')
+      .then(leaves => setPendingLeaveCount(leaves.length))
+      .catch(() => {});
 
     setStats({
       totalStudents: students.length,
@@ -151,6 +157,39 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Pending Leave / OD Alert Banner */}
+      {pendingLeaveCount > 0 && (
+        <div
+          onClick={() => navigate('/leaves')}
+          style={{
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(234, 88, 12, 0.12))',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            borderRadius: 12,
+            padding: '12px 18px',
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 20 }}>📬</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#d97706' }}>
+                {pendingLeaveCount} Pending On-Duty & Leave Application{pendingLeaveCount > 1 ? 's' : ''} Awaiting Review
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Approved applications will automatically credit student attendance records.
+              </div>
+            </div>
+          </div>
+          <button className="btn btn-warning btn-sm" style={{ padding: '4px 12px', fontSize: 11 }}>
+            Review Requests →
+          </button>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="stats-grid">

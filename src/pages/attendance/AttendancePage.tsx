@@ -9,22 +9,35 @@ import { subjectService } from '../../services/subjectService';
 import { studentService } from '../../services/studentService';
 import { attendanceService } from '../../services/attendanceService';
 import { notificationService } from '../../services/notificationService';
-import { Department, Subject, StudentFormData } from '../../types';
+import { Department, Subject, StudentFormData, AttendanceStatus, EligibilityPrediction } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { Calculator, Award, AlertTriangle, Check, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface AttRow {
   studentId: string;
   name: string;
   registerNumber: string;
-  status: 'present' | 'absent';
+  status: AttendanceStatus;
   time: string;
+  remarks?: string;
 }
 type ViewMode = 'day' | 'month';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const BLOOD_GROUPS = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+
+const PERIODS = [
+  { id: 0, label: 'Full Day (General)' },
+  { id: 1, label: 'Period 1 (09:00 - 09:50 AM)' },
+  { id: 2, label: 'Period 2 (09:50 - 10:40 AM)' },
+  { id: 3, label: 'Period 3 (10:50 - 11:40 AM)' },
+  { id: 4, label: 'Period 4 (11:40 - 12:30 PM)' },
+  { id: 5, label: 'Period 5 (01:20 - 02:10 PM)' },
+  { id: 6, label: 'Period 6 (02:10 - 03:00 PM)' },
+  { id: 7, label: 'Period 7 (03:00 - 03:50 PM)' },
+];
 
 function getDaysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDayOfMonth(y: number, m: number) { return new Date(y, m, 1).getDay(); }
@@ -42,6 +55,7 @@ export default function AttendancePage() {
   const [year, setYear] = useState('1');
   const [section, setSection] = useState('A');
   const [subjectId, setSubjectId] = useState('');
+  const [period, setPeriod] = useState<number>(0);
   const [viewMode, setViewMode] = useState<ViewMode>('day');
 
   // day-view
@@ -59,6 +73,12 @@ export default function AttendancePage() {
   // add-student modal
   const [showAddStudent, setShowAddStudent] = useState(false);
 
+  // Calculator modal
+  const [calcStudent, setCalcStudent] = useState<AttRow | null>(null);
+  const [calcTarget, setCalcTarget] = useState(75);
+  const [calcPrediction, setCalcPrediction] = useState<EligibilityPrediction | null>(null);
+  const [calcLoading, setCalcLoading] = useState(false);
+
   useEffect(() => { setDepartments(departmentService.getAll()); }, []);
 
   useEffect(() => {
@@ -75,7 +95,7 @@ export default function AttendancePage() {
     const map: Record<string, { present: number; absent: number; total: number }> = {};
     sessions.forEach((sess) => {
       const recs = attendanceService.getRecordsForSession(sess.id);
-      const p = recs.filter((r) => r.status === 'present').length;
+      const p = recs.filter((r) => r.status === 'present' || r.status === 'on_duty').length;
       map[sess.date] = { present: p, absent: recs.length - p, total: recs.length };
     });
     setCalData(map);
@@ -87,49 +107,120 @@ export default function AttendancePage() {
     if (!deptId || !subjectId || !date) { toast.error('Please fill all required fields.'); return; }
     const studs = studentService.getByDeptYearSection(deptId, Number(year), section);
     if (studs.length === 0) { toast.error('No students found for this class.'); return; }
-    const existing = attendanceService.findSession(deptId, Number(year), section, subjectId, date);
+    const existing = attendanceService.findSession(deptId, Number(year), section, subjectId, date, period === 0 ? undefined : period);
     const existRecs = existing ? attendanceService.getRecordsForSession(existing.id) : [];
-    const t = new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+    const t = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     setRows(studs.map((s) => {
       const rec = existRecs.find((r) => r.studentId === s.id);
-      return { studentId: s.id, name: s.name, registerNumber: s.registerNumber,
-               status: rec ? (rec.status as 'present' | 'absent') : 'present', time: rec?.time || t };
+      return {
+        studentId: s.id,
+        name: s.name,
+        registerNumber: s.registerNumber,
+        status: rec ? (rec.status as AttendanceStatus) : 'present',
+        time: rec?.time || t,
+        remarks: rec?.remarks || '',
+      };
     }));
     setExistingSession(!!existing);
     setLoaded(true);
   };
 
-  const toggle = (sid: string) => setRows((prev) => prev.map((r) =>
-    r.studentId === sid
-      ? { ...r, status: r.status === 'present' ? 'absent' : 'present',
-          time: r.status === 'absent' ? new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) : '' }
-      : r
-  ));
+  const setRowStatus = (sid: string, status: AttendanceStatus) => {
+    const t = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    setRows((prev) => prev.map((r) =>
+      r.studentId === sid
+        ? {
+            ...r,
+            status,
+            time: status === 'present' || status === 'late' || status === 'on_duty' ? t : '',
+          }
+        : r
+    ));
+  };
 
-  const markAll = (status: 'present' | 'absent') => {
-    const t = new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
-    setRows((prev) => prev.map((r) => ({ ...r, status, time: status === 'present' ? t : '' })));
+  const setRowRemark = (sid: string, remarks: string) => {
+    setRows((prev) => prev.map((r) => r.studentId === sid ? { ...r, remarks } : r));
+  };
+
+  const markAll = (status: AttendanceStatus) => {
+    const t = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    setRows((prev) => prev.map((r) => ({
+      ...r,
+      status,
+      time: status !== 'absent' ? t : '',
+    })));
+  };
+
+  const openCalculator = async (row: AttRow) => {
+    setCalcStudent(row);
+    setCalcLoading(true);
+    try {
+      const pred = await attendanceService.predictEligibility(row.studentId, calcTarget);
+      setCalcPrediction(pred);
+    } catch {
+      toast.error('Could not compute prediction');
+    } finally {
+      setCalcLoading(false);
+    }
+  };
+
+  const handleTargetChange = async (target: number) => {
+    setCalcTarget(target);
+    if (calcStudent) {
+      setCalcLoading(true);
+      const pred = await attendanceService.predictEligibility(calcStudent.studentId, target);
+      setCalcPrediction(pred);
+      setCalcLoading(false);
+    }
   };
 
   const saveAttendance = async () => {
     setSaving(true);
     try {
-      attendanceService.saveAttendance(
-        { departmentId: deptId, year: Number(year), section, subjectId, facultyId: user?.facultyId || 'f1', date },
-        rows.map((r) => ({ studentId: r.studentId, status: r.status, time: r.time }))
+      const selectedPeriodObj = PERIODS.find(p => p.id === period);
+      await attendanceService.saveAttendance(
+        {
+          departmentId: deptId,
+          year: Number(year),
+          section,
+          subjectId,
+          facultyId: user?.facultyId || 'f1',
+          date,
+          period: period > 0 ? period : undefined,
+          periodLabel: selectedPeriodObj?.label,
+        },
+        rows.map((r) => ({ studentId: r.studentId, status: r.status, time: r.time, remarks: r.remarks })),
+        user
       );
+
       const sub = subjects.find((s) => s.id === subjectId);
-      if (user) notificationService.create({ userId: user.id, title: 'Attendance Saved', message: `${sub?.name} – Sec ${section} on ${date} saved.`, type: 'success' });
+      if (user) {
+        notificationService.create({
+          userId: user.id,
+          title: 'Attendance Recorded',
+          message: `${sub?.name || 'Class'} (Sec ${section}) - ${selectedPeriodObj?.label || 'General'} on ${date} recorded.`,
+          type: 'success',
+        });
+      }
+
       toast.success(`Attendance ${existingSession ? 'updated' : 'saved'} for ${rows.length} students!`);
       setExistingSession(true);
       if (viewMode === 'month') loadCalendarData();
-    } catch (err: any) { toast.error(err.message || 'Failed to save.'); }
-    finally { setSaving(false); }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const presentCount = rows.filter((r) => r.status === 'present').length;
-  const absentCount = rows.length - presentCount;
-  const pct = rows.length > 0 ? Math.round((presentCount / rows.length) * 100) : 0;
+  const onDutyCount = rows.filter((r) => r.status === 'on_duty').length;
+  const lateCount = rows.filter((r) => r.status === 'late').length;
+  const medicalCount = rows.filter((r) => r.status === 'medical_leave').length;
+  const absentCount = rows.filter((r) => r.status === 'absent').length;
+
+  const effectivePresent = presentCount + onDutyCount + medicalCount + (lateCount * 0.5);
+  const pct = rows.length > 0 ? Math.round((effectivePresent / rows.length) * 100) : 0;
 
   const handleCalClick = (ds: string) => {
     if (ds > todayStr()) return;
@@ -141,8 +232,8 @@ export default function AttendancePage() {
       {/* Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">Attendance</h1>
-          <p className="page-subtitle">Mark and view student attendance by day or month</p>
+          <h1 className="page-title">Attendance Tracking</h1>
+          <p className="page-subtitle">Multi-status period attendance marking with real-time academic credit calculations</p>
         </div>
         <div className="page-actions">
           <button className="btn btn-secondary" onClick={() => setShowAddStudent(true)} id="btn-add-student">
@@ -154,7 +245,7 @@ export default function AttendancePage() {
       {/* Class Filter */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">
-          <span className="card-title">🎓 Class Selection</span>
+          <span className="card-title">🎓 Class & Period Session Selection</span>
           {existingSession && loaded && <span className="badge badge-warning">⚠️ Editing existing record</span>}
         </div>
         <div className="card-body">
@@ -183,6 +274,12 @@ export default function AttendancePage() {
               <select className="form-input form-select" value={subjectId} onChange={(e) => { setSubjectId(e.target.value); setLoaded(false); }}>
                 <option value="">Select Subject</option>
                 {subjects.map((s) => <option key={s.id} value={s.id}>{s.code} – {s.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Period / Hour Slot</label>
+              <select className="form-input form-select" value={period} onChange={(e) => { setPeriod(Number(e.target.value)); setLoaded(false); }}>
+                {PERIODS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
               </select>
             </div>
             {viewMode === 'day' && (
@@ -221,23 +318,27 @@ export default function AttendancePage() {
         <>
           {loaded && rows.length > 0 && (
             <>
+              {/* Stat Cards */}
               <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                 {[
-                  { count: presentCount, label: 'Present', icon: <CheckCircle size={20} color="#059669" />, bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)', border: '#6ee7b7', color: '#059669', sub: '#065f46' },
-                  { count: absentCount, label: 'Absent', icon: <XCircle size={20} color="#dc2626" />, bg: 'linear-gradient(135deg,#fee2e2,#fecaca)', border: '#fca5a5', color: '#dc2626', sub: '#7f1d1d' },
-                  { count: `${pct}%`, label: "Today's Rate", icon: <TrendingUp size={20} color="#7c3aed" />, bg: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', border: '#c4b5fd', color: '#7c3aed', sub: '#4c1d95' },
+                  { count: presentCount, label: 'Present (P)', icon: <CheckCircle size={20} color="#059669" />, bg: 'linear-gradient(135deg,#d1fae5,#a7f3d0)', border: '#6ee7b7', color: '#059669', sub: '#065f46' },
+                  { count: absentCount, label: 'Absent (A)', icon: <XCircle size={20} color="#dc2626" />, bg: 'linear-gradient(135deg,#fee2e2,#fecaca)', border: '#fca5a5', color: '#dc2626', sub: '#7f1d1d' },
+                  { count: onDutyCount + medicalCount, label: 'OD / Medical', icon: <Award size={20} color="#2563eb" />, bg: 'linear-gradient(135deg,#dbeafe,#bfdbfe)', border: '#93c5fd', color: '#2563eb', sub: '#1e40af' },
+                  { count: lateCount, label: 'Late (0.5 credit)', icon: <Clock size={20} color="#d97706" />, bg: 'linear-gradient(135deg,#fef3c7,#fde68a)', border: '#fcd34d', color: '#d97706', sub: '#92400e' },
+                  { count: `${pct}%`, label: "Effective Rate", icon: <TrendingUp size={20} color="#7c3aed" />, bg: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', border: '#c4b5fd', color: '#7c3aed', sub: '#4c1d95' },
                 ].map((item) => (
-                  <div key={item.label} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: 12, padding: '12px 22px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 110 }}>
+                  <div key={item.label} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: 12, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10, minWidth: 105 }}>
                     {item.icon}
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: 22, color: item.color, lineHeight: 1 }}>{item.count}</div>
+                      <div style={{ fontWeight: 800, fontSize: 20, color: item.color, lineHeight: 1 }}>{item.count}</div>
                       <div style={{ fontSize: 11, color: item.sub, marginTop: 2 }}>{item.label}</div>
                     </div>
                   </div>
                 ))}
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                  <button className="btn btn-success btn-sm" id="btn-mark-all-present" onClick={() => markAll('present')}><CheckCircle size={14} /> Mark All Present</button>
-                  <button className="btn btn-danger btn-sm" id="btn-mark-all-absent" onClick={() => markAll('absent')}><XCircle size={14} /> Mark All Absent</button>
+
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn btn-success btn-sm" id="btn-mark-all-present" onClick={() => markAll('present')}><CheckCircle size={14} /> All Present</button>
+                  <button className="btn btn-danger btn-sm" id="btn-mark-all-absent" onClick={() => markAll('absent')}><XCircle size={14} /> All Absent</button>
                 </div>
               </div>
 
@@ -245,11 +346,26 @@ export default function AttendancePage() {
                 <div className="table-wrapper" style={{ border: 'none' }}>
                   <table className="data-table">
                     <thead><tr>
-                      <th>#</th><th>Register No.</th><th>Student Name</th><th>Status</th><th>Time</th><th>Toggle</th>
+                      <th>#</th>
+                      <th>Register No.</th>
+                      <th>Student Name</th>
+                      <th>Current Status</th>
+                      <th>Quick Status Actions</th>
+                      <th>Remarks / Reason</th>
+                      <th>Predictor</th>
                     </tr></thead>
                     <tbody>
                       {rows.map((row, i) => (
-                        <tr key={row.studentId} style={{ background: row.status === 'absent' ? 'rgba(239,68,68,0.04)' : 'transparent', transition: 'background 0.2s' }}>
+                        <tr key={row.studentId} style={{
+                          background: row.status === 'absent'
+                            ? 'rgba(239,68,68,0.04)'
+                            : row.status === 'on_duty'
+                            ? 'rgba(37,99,235,0.04)'
+                            : row.status === 'late'
+                            ? 'rgba(245,158,11,0.04)'
+                            : 'transparent',
+                          transition: 'background 0.2s',
+                        }}>
                           <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{i + 1}</td>
                           <td><code style={{ fontSize: 12, background: 'var(--bg-surface-2)', padding: '2px 6px', borderRadius: 4 }}>{row.registerNumber}</code></td>
                           <td>
@@ -261,16 +377,121 @@ export default function AttendancePage() {
                             </div>
                           </td>
                           <td>
-                            {row.status === 'present'
-                              ? <span className="status-present"><span className="status-dot present" />Present</span>
-                              : <span className="status-absent"><span className="status-dot absent" />Absent</span>}
+                            {row.status === 'present' && <span className="status-present"><span className="status-dot present" />Present</span>}
+                            {row.status === 'absent' && <span className="status-absent"><span className="status-dot absent" />Absent</span>}
+                            {row.status === 'late' && <span className="badge badge-warning">⏰ Late (0.5)</span>}
+                            {row.status === 'on_duty' && <span className="badge badge-primary">🎓 On-Duty (OD)</span>}
+                            {row.status === 'medical_leave' && <span className="badge badge-info">🏥 Medical Leave</span>}
                           </td>
-                          <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{row.status === 'present' ? row.time : '—'}</td>
                           <td>
-                            <div className="att-toggle">
-                              <button className={`att-toggle-btn present ${row.status === 'present' ? 'active' : ''}`} onClick={() => row.status === 'absent' && toggle(row.studentId)}>P</button>
-                              <button className={`att-toggle-btn absent ${row.status === 'absent' ? 'active' : ''}`} onClick={() => row.status === 'present' && toggle(row.studentId)}>A</button>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                type="button"
+                                onClick={() => setRowStatus(row.studentId, 'present')}
+                                title="Present"
+                                style={{
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  background: row.status === 'present' ? '#10b981' : 'var(--bg-surface-2)',
+                                  color: row.status === 'present' ? '#fff' : 'var(--text-muted)',
+                                }}
+                              >
+                                P
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRowStatus(row.studentId, 'absent')}
+                                title="Absent"
+                                style={{
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  background: row.status === 'absent' ? '#ef4444' : 'var(--bg-surface-2)',
+                                  color: row.status === 'absent' ? '#fff' : 'var(--text-muted)',
+                                }}
+                              >
+                                A
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRowStatus(row.studentId, 'late')}
+                                title="Late arrival"
+                                style={{
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  background: row.status === 'late' ? '#f59e0b' : 'var(--bg-surface-2)',
+                                  color: row.status === 'late' ? '#fff' : 'var(--text-muted)',
+                                }}
+                              >
+                                L
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRowStatus(row.studentId, 'on_duty')}
+                                title="On-Duty (Symposium, Sports)"
+                                style={{
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  background: row.status === 'on_duty' ? '#2563eb' : 'var(--bg-surface-2)',
+                                  color: row.status === 'on_duty' ? '#fff' : 'var(--text-muted)',
+                                }}
+                              >
+                                OD
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRowStatus(row.studentId, 'medical_leave')}
+                                title="Medical Leave"
+                                style={{
+                                  border: 'none',
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  background: row.status === 'medical_leave' ? '#6366f1' : 'var(--bg-surface-2)',
+                                  color: row.status === 'medical_leave' ? '#fff' : 'var(--text-muted)',
+                                }}
+                              >
+                                ML
+                              </button>
                             </div>
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              placeholder="Notes (optional)..."
+                              value={row.remarks || ''}
+                              onChange={(e) => setRowRemark(row.studentId, e.target.value)}
+                              className="form-input"
+                              style={{ height: 30, fontSize: 11, minWidth: 130 }}
+                            />
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => openCalculator(row)}
+                              title="Calculate Detention Risk & Attendance Advice"
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                            >
+                              <Calculator size={13} color="#6366f1" /> Check Risk
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -280,11 +501,114 @@ export default function AttendancePage() {
                 <div className="card-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                   <button className="btn btn-secondary" id="btn-reset" onClick={() => { setLoaded(false); setRows([]); }}><RefreshCw size={15} /> Reset</button>
                   <button id="btn-save-attendance" className={`btn btn-primary ${saving ? 'btn-loading' : ''}`} onClick={saveAttendance} disabled={saving}>
-                    {!saving && <><Save size={15} /> {existingSession ? 'Update Attendance' : 'Save Attendance'}</>}
+                    {!saving && <><Save size={15} /> {existingSession ? 'Update Attendance' : 'Save Attendance Session'}</>}
                   </button>
                 </div>
               </div>
             </>
+          )}
+
+          {/* Detention & Eligibility Calculator Modal */}
+          {calcStudent && (
+            <div className="modal-overlay">
+              <div className="modal" style={{ maxWidth: 480 }}>
+                <div className="modal-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(99,102,241,0.12)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Calculator size={18} />
+                    </div>
+                    <div>
+                      <h3 className="modal-title" style={{ fontSize: 15 }}>Attendance Eligibility Predictor</h3>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {calcStudent.name} ({calcStudent.registerNumber})
+                      </div>
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost btn-icon" onClick={() => setCalcStudent(null)}>✕</button>
+                </div>
+
+                <div className="modal-body">
+                  {calcLoading ? (
+                    <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>Computing algorithms...</div>
+                  ) : calcPrediction ? (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>Target Threshold: {calcTarget}%</span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {[75, 80, 85].map(t => (
+                            <button
+                              key={t}
+                              className={`btn btn-sm ${calcTarget === t ? 'btn-primary' : 'btn-secondary'}`}
+                              style={{ padding: '2px 8px', fontSize: 11 }}
+                              onClick={() => handleTargetChange(t)}
+                            >
+                              {t}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Score Highlight Card */}
+                      <div style={{
+                        background: calcPrediction.status === 'critical'
+                          ? 'rgba(239, 68, 68, 0.08)'
+                          : calcPrediction.status === 'warning'
+                          ? 'rgba(245, 158, 11, 0.08)'
+                          : 'rgba(16, 185, 129, 0.08)',
+                        border: `1px solid ${calcPrediction.status === 'critical' ? '#fca5a5' : calcPrediction.status === 'warning' ? '#fde68a' : '#6ee7b7'}`,
+                        borderRadius: 12,
+                        padding: 16,
+                        marginBottom: 16,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Current Standing</div>
+                            <div style={{ fontSize: 28, fontWeight: 800, color: calcPrediction.currentPercentage >= calcTarget ? '#10b981' : '#ef4444' }}>
+                              {calcPrediction.currentPercentage}%
+                            </div>
+                          </div>
+                          <span className={`badge ${calcPrediction.status === 'critical' ? 'badge-danger' : calcPrediction.status === 'warning' ? 'badge-warning' : 'badge-success'}`}>
+                            {calcPrediction.status === 'critical' ? '⛔ CRITICAL DETENTION RISK' : calcPrediction.status === 'warning' ? '⚠️ WARNING ZONE' : '✅ SAFE & ELIGIBLE'}
+                          </span>
+                        </div>
+
+                        <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.5, color: 'var(--text-primary)' }}>
+                          <strong>Algorithmic Advice:</strong> {calcPrediction.advice}
+                        </div>
+                      </div>
+
+                      {/* Stat Breakdown Grid */}
+                      <div className="form-grid form-grid-2" style={{ marginBottom: 0 }}>
+                        <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total Conducted Hours</div>
+                          <div style={{ fontSize: 18, fontWeight: 700 }}>{calcPrediction.totalConducted} classes</div>
+                        </div>
+                        <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Attended / Credit Hours</div>
+                          <div style={{ fontSize: 18, fontWeight: 700 }}>{calcPrediction.totalAttended} classes</div>
+                        </div>
+                        <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Classes Needed to Reach {calcTarget}%</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#ef4444' }}>
+                            {calcPrediction.classesNeededToReachTarget} consecutive
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 8 }}>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Safe Bunk Allowance</div>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: '#10b981' }}>
+                            {calcPrediction.classesCanSafelyMiss} classes
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setCalcStudent(null)}>Close</button>
+                </div>
+              </div>
+            </div>
           )}
           {!loaded && (
             <div className="card">
